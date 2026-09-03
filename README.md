@@ -30,6 +30,7 @@ An end-to-end Python tool that turns any YouTube video or audio/video file into 
 ## 📁 Project Structure
 
 ```
+├── assets                        # Screenshots of the output
 ├── core/
 │   └── extractor.py              # Extracts action items, decisions & questions
 │   └── rag_engine.py             # Retrieval-Augmented Generation workflow
