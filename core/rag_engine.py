@@ -54,3 +54,44 @@ Context from meeting transcript:
 
     return rag_chain
 
+
+def load_rag_chain():
+    vector_store = load_vector_store()
+    retriver = get_retriever()
+
+    llm = get_llm()
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            """You are an expert meeting assistant. Answer the user's question 
+based ONLY on the meeting transcript context provided below.
+
+If the answer is not found in the context, say: 
+"I could not find this information in the meeting transcript."
+
+Always be concise and precise. If quoting someone, mention it clearly.
+
+Context from meeting transcript:
+{context}""",
+        ),
+        ("human", "{question}"),
+    ])
+
+    rag_chain = (
+        {
+            "context":  retriver| RunnableLambda(format_docs),
+            "question": RunnablePassthrough(),
+        }
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    return rag_chain
+
+
+def ask_question(rag_chain, question:str) -> str:
+    print(f"Question : {question}")
+    answer = rag_chain.invoke(question)
+    print(f"answer :{answer}")
+    return answer
