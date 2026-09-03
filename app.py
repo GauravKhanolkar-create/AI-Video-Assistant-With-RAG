@@ -6,6 +6,7 @@ from core.transcriber import transcribe_all
 from core.summarize import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
 from core.rag_engine import build_rag_chain, ask_question
+from fpdf import FPDF
 
 load_dotenv()
 
@@ -329,6 +330,89 @@ def render_step_bar(label: str, key: str, icon: str):
         <span>{icon} {label}</span>
     </div>""", unsafe_allow_html=True)
 
+def sanitize_pdf_text(text: str) -> str:
+    """FPDF's core fonts (Helvetica) only support latin-1. Swap common
+    'smart' Unicode punctuation for ASCII equivalents, then safety-net
+    anything else so the export never crashes on unexpected characters
+    (e.g. from Hindi/Hinglish transcripts)."""
+    replacements = {
+        "\u2014": "-",   # em dash —
+        "\u2013": "-",   # en dash –
+        "\u2018": "'",   # left single quote '
+        "\u2019": "'",   # right single quote '
+        "\u201c": '"',   # left double quote "
+        "\u201d": '"',   # right double quote "
+        "\u2026": "...", # ellipsis …
+        "\u2022": "-",   # bullet •
+    }
+    for uni_char, ascii_char in replacements.items():
+        text = text.replace(uni_char, ascii_char)
+    # Catch-all: replace any remaining unsupported characters instead of crashing
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
+def _safe_wrap(pdf: FPDF, text: str, max_width: float) -> list[str]:
+    """Wrap text into lines that are guaranteed to fit max_width, measured
+    with the PDF's actual current font metrics (not a guessed character
+    count). Words longer than max_width on their own are broken at the
+    character level, so nothing can ever overflow the page."""
+    words = text.split(" ")
+    lines: list[str] = []
+    current = ""
+
+    for word in words:
+        candidate = f"{current} {word}".strip() if current else word
+        if pdf.get_string_width(candidate) <= max_width:
+            current = candidate
+            continue
+
+        if current:
+            lines.append(current)
+            current = ""
+
+        # The word itself is too wide (e.g. a long URL) — break it by character.
+        while pdf.get_string_width(word) > max_width:
+            cut = len(word)
+            while cut > 1 and pdf.get_string_width(word[:cut]) > max_width:
+                cut -= 1
+            lines.append(word[:cut])
+            word = word[cut:]
+        current = word
+
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
+def generate_pdf(text: str) -> bytes:
+    """Build a simple PDF from plain text for the report export.
+
+    Lines are pre-wrapped using the font's actual measured character
+    widths (via get_string_width), with a safety margin. Wrapped lines
+    are drawn with cell() rather than multi_cell() — cell() does not
+    re-run its own internal word-break pass, which is what kept
+    raising 'Not enough horizontal space to render a single character'
+    even on lines our own measurement confirmed would fit (a rounding
+    mismatch between our pass and FPDF's internal one).
+    """
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=11)
+    clean_text = sanitize_pdf_text(text)
+
+    # 10% safety margin so our measurement never sits exactly on FPDF's edge
+    usable_width = (pdf.w - pdf.l_margin - pdf.r_margin) * 0.9
+
+    for line in clean_text.split("\n"):
+        if line.strip() == "":
+            pdf.ln(4)
+            continue
+        for wrapped_line in _safe_wrap(pdf, line, usable_width):
+            pdf.cell(0, 6, text=wrapped_line, new_x="LMARGIN", new_y="NEXT")
+
+    return bytes(pdf.output(dest="S"))
+
 # ─── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="hero-title" style="font-size:1.6rem">🎬 AI<br>Video</div>', unsafe_allow_html=True)
@@ -476,6 +560,46 @@ if st.session_state.result:
             <div class="card-title">❓ Open Questions</div>
             <div class="card-content">{r['open_questions']}</div>
         </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Download Summary ─────────────────────────────────────────────────────
+    report_text = f"""AI VIDEO ASSISTANT — MEETING REPORT
+{'='*50}
+
+TITLE:
+{r['title']}
+
+SUMMARY:
+{r['summary']}
+
+ACTION ITEMS:
+{r['action_items']}
+
+KEY DECISIONS:
+{r['key_decisions']}
+
+OPEN QUESTIONS:
+{r['open_questions']}
+"""
+
+    dl_col1, dl_col2 = st.columns(2, gap="small")
+    with dl_col1:
+        st.download_button(
+            label="📄 Download Report (TXT)",
+            data=report_text,
+            file_name=f"{r['title'].replace(' ', '_')}_report.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+    with dl_col2:
+        st.download_button(
+            label="📄 Download Report (PDF)",
+            data=generate_pdf(report_text),
+            file_name=f"{r['title'].replace(' ', '_')}_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
 
     st.markdown("---")
 
