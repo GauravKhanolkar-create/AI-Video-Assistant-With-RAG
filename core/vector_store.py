@@ -15,6 +15,7 @@ def get_embeddings():
     )
 
 def build_vector_store(transcript : str)->Chroma:
+  
     print("Building vector Store")
 
     splitter = RecursiveCharacterTextSplitter(
@@ -38,8 +39,6 @@ def build_vector_store(transcript : str)->Chroma:
 
     return vector_store
 
-
-
 def load_vector_store() ->Chroma:
     embeddings = get_embeddings()
     vector_store = Chroma(
@@ -55,4 +54,3 @@ def get_retriever(vector_store : Chroma, k :int = 4):
         search_type = 'similarity',
         search_kwargs = {"k":k}
     )
-

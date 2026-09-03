@@ -27,16 +27,13 @@ def build_rag_chain(transcript:str):
 
         [(
             "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
-
-If the answer is not found in the context, say: 
-"I could not find this information in the meeting transcript."
-
-Always be concise and precise. If quoting someone, mention it clearly.
-
-Context from meeting transcript:
-{context}""",
+            """You are an expert meeting assistant. 
+               Answer the user's question based ONLY on the meeting transcript context provided below.
+               If the answer is not found in the context, say: 
+               "I could not find this information in the meeting transcript."
+                Always be concise and precise. If quoting someone, mention it clearly.
+                Context from meeting transcript:{context}
+            """,
         ),
         ("human", "{question}"),
     ]
@@ -54,8 +51,8 @@ Context from meeting transcript:
 
     return rag_chain
 
-
 def load_rag_chain():
+    
     vector_store = load_vector_store()
     retriver = get_retriever()
 
@@ -63,16 +60,12 @@ def load_rag_chain():
     prompt = ChatPromptTemplate.from_messages([
         (
             "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
-
-If the answer is not found in the context, say: 
-"I could not find this information in the meeting transcript."
-
-Always be concise and precise. If quoting someone, mention it clearly.
-
-Context from meeting transcript:
-{context}""",
+            """You are an expert meeting assistant. 
+               Answer the user's question based ONLY on the meeting transcript context provided below.
+               If the answer is not found in the context, say: 
+               "I could not find this information in the meeting transcript."
+                Always be concise and precise. If quoting someone, mention it clearly.
+                Context from meeting transcript: {context}""",
         ),
         ("human", "{question}"),
     ])
@@ -88,7 +81,6 @@ Context from meeting transcript:
     )
 
     return rag_chain
-
 
 def ask_question(rag_chain, question:str) -> str:
     print(f"Question : {question}")

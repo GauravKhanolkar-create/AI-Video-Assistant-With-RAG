@@ -28,11 +28,13 @@ def load_model():
 def transcribe_chunk_whisper(chunk_path: str) -> str:
 
     model = load_model()  
+
     result = model.transcribe(chunk_path, task="transcribe")  
     return result["text"]  
 
 def _send_to_sarvam(piece_path: str) -> str:
     """Send one ≤30s WAV file to Sarvam and return the English transcript."""
+  
     headers = {"api-subscription-key": SARVAM_API_KEY}
 
     with open(piece_path, "rb") as f:
@@ -54,8 +56,9 @@ def _send_to_sarvam(piece_path: str) -> str:
     return response.json().get("transcript", "")
 
 def transcribe_chunk_sarvam(chunk_path: str) -> str:
-    """Sarvam sync API only accepts ≤30s audio. We split this chunk into
-       25-second pieces, send each separately, and join the transcripts.
+    """
+    Sarvam sync API only accepts ≤30s audio. We split this chunk into
+    25-second pieces, send each separately, and join the transcripts.
     """
     if not SARVAM_API_KEY:
         raise RuntimeError("SARVAM_API_KEY is not set in environment / .env")
